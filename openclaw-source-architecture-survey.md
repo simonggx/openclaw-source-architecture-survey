@@ -1,15 +1,21 @@
 ---
-summary: "Repo-wide survey of the OpenClaw source architecture, subsystems, and integration seams"
+summary: "OpenClaw 源码总体架构调研：控制面、执行面、扩展面与客户端面的整体关系"
 read_when:
-  - Reviewing the OpenClaw codebase at a system level
-  - Understanding how gateway, agents, plugins, channels, and clients fit together
-  - Planning architecture work across core, extensions, UI, or native clients
-title: "OpenClaw Source Architecture Survey"
+  - 想先从整体理解 OpenClaw 是什么
+  - 想快速建立 Gateway / Agents / Plugins / Clients 的关系图
+  - 想决定接下来应该深入哪个子系统
+title: "OpenClaw 源码总体架构调研 / OpenClaw Source Architecture Survey"
 ---
 
-# OpenClaw Source Architecture Survey
+# OpenClaw 源码总体架构调研 / OpenClaw Source Architecture Survey
 
-This document summarizes a full-source survey of the OpenClaw repository. It focuses on the system's main architectural spine, the role of each major module, and the relationships between the control plane, agent runtime, plugin SDK, extensions, and client surfaces.
+这份文档是整个 OpenClaw 调研仓库的**总览页**。它的目标不是穷举所有文件，而是先回答三个根问题：
+
+1. **OpenClaw 从系统形态上到底是什么？**
+2. **它的核心技术框架由哪些部分组成？**
+3. **这些部分之间是怎样连起来的？**
+
+This document is the **high-level survey** of the OpenClaw codebase. Its goal is not to enumerate every file, but to answer three fundamental questions: what OpenClaw is as a system, which major parts make up the framework, and how those parts connect.
 
 ## 快速跳转 / Quick Links
 
@@ -18,561 +24,284 @@ This document summarizes a full-source survey of the OpenClaw repository. It foc
 - 源码导读 / Source guide: [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)
 - 分层架构图 / Layered architecture: [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
 
-## Executive summary
+---
 
-OpenClaw is best understood as a **gateway-centric, plugin-extended AI agent platform**.
+## 一、先给结论 / Executive Summary
 
-It is not organized as a single chat app or a thin CLI wrapper around one model provider. Instead, the repository centers around four major architectural layers:
+一句话说，**OpenClaw 不是单一聊天应用，也不是简单的 CLI 包装器，而是一个以 Gateway 为中枢、以 Agent Runtime 为执行引擎、以 Plugin SDK 为扩展边界、以多端客户端和多渠道接入为产品表面的 AI 平台型系统。**
 
-1. **Gateway control plane** in `src/gateway/`
-2. **Agent/session execution runtime** in `src/agents/`, `src/sessions/`, and `src/routing/`
-3. **Plugin host + public SDK boundary** in `src/plugins/` and `src/plugin-sdk/`
-4. **Product and integration surfaces** in `extensions/`, `ui/`, `apps/`, and `Swabble/`
+In one sentence: **OpenClaw is not a single chat app or a thin CLI wrapper. It is a Gateway-centered AI platform with an Agent Runtime execution core, a Plugin SDK extension boundary, and multiple client/channel product surfaces.**
 
-At a high level, the runtime flow is:
+更具体一点，OpenClaw 可以拆成四个最核心的层次：
+
+1. **控制面 / Control Plane**：Gateway、协议、认证、配对、配置
+2. **执行面 / Execution Plane**：Agents、Sessions、Routing、Auto-Reply、Tasks/Flows
+3. **扩展面 / Extension Plane**：Plugins、Plugin SDK、Hooks、Extensions 生态
+4. **客户端面 / Client Plane**：Web UI、iOS、Android、macOS、OpenClawKit、Swabble
+
+---
+
+## 二、从运行链看整体 / Runtime Spine at a Glance
+
+下面这张总图是理解 OpenClaw 最有效的入口：
+
+The following high-level flow is the most effective starting point for understanding OpenClaw.
 
 ```mermaid
 flowchart LR
-  A[CLI / Web UI / Native apps / Channels / ACP] --> B[Gateway]
-  B --> C[Sessions + Routing]
-  C --> D[Agent Runtime]
-  D --> E[Tools / Providers / Hooks]
-  E --> F[Outbound Channels / Native Nodes / Web APIs]
+  A[CLI / Web UI / Native Apps / Channels / ACP]
+  B[Gateway]
+  C[Sessions + Routing]
+  D[Agent Runtime]
+  E[Tools / Providers / Hooks / Plugins]
+  F[Outbound Channels / Native Nodes / Web APIs]
+
+  A --> B
+  B --> C
+  C --> D
+  D --> E
+  E --> F
 ```
 
-## Repository shape
+这条链的意思是：
 
-OpenClaw is a `pnpm` monorepo. The workspace is defined in `pnpm-workspace.yaml` and includes:
+- 所有外部入口先进入 Gateway
+- Gateway 不直接做全部工作，而是把上下文交给 Sessions/Routing
+- Sessions/Routing 决定工作落到哪个会话和哪个 agent
+- Agent Runtime 负责真正执行一次 agent turn
+- 执行面再通过 plugins / tools / providers 等能力完成工作
+- 最终结果再回到外部渠道、客户端或节点
 
-- root package `.`
-- `ui`
-- `packages/*`
-- `extensions/*`
+This flow means that all ingress surfaces first enter the Gateway, then pass through session/routing resolution, then into the Agent Runtime, which in turn uses plugins, tools, and providers before returning results outward.
 
-The top-level directories have distinct responsibilities:
+---
 
-| Path | Role |
-| --- | --- |
-| `src/` | Core runtime, gateway, agent engine, config, security, plugin host |
-| `extensions/` | Bundled plugin ecosystem: channels, providers, multimodal, tools, memory |
-| `packages/` | Internal support packages and compatibility shims |
-| `ui/` | Browser-based Control UI |
-| `apps/` | Android, iOS, macOS native clients and shared Apple SDK |
-| `Swabble/` | Swift wake-word / local voice tooling project |
-| `docs/` | Public architecture, protocol, plugin, platform, and operations docs |
+## 三、代码仓库形态 / Repository Shape
 
-## Core architectural spine
+OpenClaw 是一个 `pnpm` monorepo。最关键的顶层目录可以这样看：
 
-## 1. Gateway control plane
+OpenClaw is a `pnpm` monorepo. The top-level directories can be interpreted like this:
+
+| 路径 / Path | 角色（中文） | Role (English) |
+| --- | --- | --- |
+| `src/` | 宿主核心运行时 | Core host runtime |
+| `extensions/` | bundled 插件生态 | Bundled plugin ecosystem |
+| `packages/` | 内部支持包 | Internal support packages |
+| `ui/` | 浏览器 Control UI | Browser-based Control UI |
+| `apps/` | Android / iOS / macOS 原生客户端 | Native clients |
+| `Swabble/` | 本地语音唤醒/语音 companion | Local wake-word / voice companion |
+| `docs/` | 官方架构和协议文档 | Public architecture and protocol docs |
+
+这意味着 OpenClaw 从一开始就是按“平台”而不是“单 app”来组织的。
+
+This means OpenClaw is organized as a **platform**, not just as a single app.
+
+---
+
+## 四、核心技术框架 / Core Technical Framework
+
+## 1. Gateway 控制面 / Gateway Control Plane
 
 相关深挖 / Related deep dive: [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md)
 
-The Gateway is the system center.
+Gateway 是整个系统的中枢。它负责：
 
-The architecture docs describe it as a single long-lived process that owns messaging surfaces, client connections, node connections, and HTTP/WS endpoints. The implementation in `src/gateway/` confirms that the Gateway is responsible for:
+- HTTP / WS 对外入口
+- Control UI 服务
+- 客户端与节点连接
+- auth / pairing / ingress policy
+- chat / hook / plugin route / OpenAI-compatible APIs
 
-- WebSocket protocol serving
-- HTTP APIs and health probes
-- Control UI asset serving
-- plugin route hosting
-- node/device connectivity
-- session and chat request entry
-- auth, pairing, and security checks
-- OpenAI/OpenResponses-compatible HTTP surfaces
+The Gateway is the system center. It owns HTTP/WS ingress, Control UI serving, client/node connectivity, auth/pairing policy, and external request surfaces such as chat, hooks, plugin routes, and OpenAI-compatible APIs.
 
-Key files:
+从架构角度说，Gateway 既是：
 
-- `src/gateway/server-http.ts`
-- `src/gateway/control-ui.ts`
-- `src/gateway/boot.ts`
-- `src/gateway/protocol/schema.ts`
-- `docs/concepts/architecture.md`
+- **系统边界 / system boundary**
+- **控制总线 / control bus**
 
-The Gateway is therefore both:
-
-- an **ingress layer** for humans, clients, channels, and nodes
-- a **coordination layer** for the rest of the runtime
-
-## 2. Agent runtime
+## 2. Agent Runtime 执行面 / Agent Runtime Execution Plane
 
 相关深挖 / Related deep dive: [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md)
 
-The second major spine is `src/agents/`.
+`src/agents/` 是 OpenClaw 真正的执行引擎。它负责：
 
-This directory is large because it does far more than simple prompt dispatch. It contains the execution machinery for:
+- context 组装
+- model/provider 选择
+- auth profile 选择
+- tool execution
+- compaction / fallback / subagent / transport
 
-- agent runs and orchestration
-- model/provider resolution
-- auth profile selection
-- tool execution and process hosts
-- context assembly and compaction
-- failover and fallback handling
-- MCP/ACP transport support
-- execution approvals and run policies
+`src/agents/` is the actual execution engine. It handles context assembly, model/provider selection, auth profile resolution, tool execution, compaction, fallback, subagents, and transport bridges.
 
-This is the part of the system that actually turns a session request into model output plus tool use.
+一句话说：**Gateway 决定工作从哪里进来，Agents 决定工作怎么做完。**
 
-In practice, the runtime split is:
+In short: **Gateway decides where work enters; Agents decide how the work is completed.**
 
-- **Gateway** decides where work enters and how it is tracked
-- **Agents** decide how that work is executed
-
-## 3. Sessions and routing
+## 3. Sessions / Routing / Auto-Reply 中间编排层
 
 相关深挖 / Related deep dive: [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md)
 
-OpenClaw is a multi-channel, multi-agent, multi-account system, so a dedicated session/routing layer is essential.
+这部分是 OpenClaw 的“中间层”，非常关键，因为它决定：
 
-Important directories:
+- 这条消息属于谁
+- 应该落哪个 session
+- 是否应该 auto-reply
+- reply 应该如何进入 agent runtime
 
-- `src/sessions/`
-- `src/routing/`
+This middle layer decides who owns a message, which session it belongs to, whether auto-reply should trigger, and how the reply enters the agent runtime.
 
-These modules handle:
+如果没有这一层，多渠道、多账号、多 agent 系统很快就会乱掉。
 
-- session key and session id resolution
-- transcript lifecycle events
-- model/provider/session overrides
-- account and route lookup
-- continuity across channels and clients
+Without this layer, a multi-channel, multi-account, multi-agent system would quickly become chaotic.
 
-They are the bridge between inbound identity and runtime execution. Without them, the platform could not safely multiplex one Gateway across many channels, operators, and agents.
-
-## 4. Plugin host and SDK boundary
+## 4. Plugin Host + Plugin SDK 扩展边界
 
 相关深挖 / Related deep dive: [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md)
 
-This is the defining OpenClaw design choice.
+这是 OpenClaw 最有代表性的设计之一。它把“宿主内部”和“插件对外边界”明确拆开：
 
-### `src/plugins/`
+- `src/plugins/`：宿主内部的 discovery / loader / registry / runtime 机制
+- `src/plugin-sdk/`：给插件作者用的正式公共契约
 
-The plugin host owns:
+This is one of OpenClaw’s defining architectural choices. It clearly separates host internals (`src/plugins/`) from the public extension boundary (`src/plugin-sdk/`).
 
-- discovery
-- manifest loading
-- enablement and validation
-- runtime loading
-- registry assembly
-- registration of tools, providers, channels, services, hooks, routes, and commands
+这意味着 OpenClaw 的扩展不是“偷 import 宿主内部模块”，而是沿着正式 SDK 边界进入系统。
 
-`src/plugins/registry.ts` shows the true width of the plugin model. Plugins can register:
+That means extensions are not meant to “sneak-import host internals”; they are expected to enter through a formal SDK boundary.
 
-- tools
-- hooks and typed hooks
-- channels
-- provider families
-- speech / realtime voice / realtime transcription
-- media understanding
-- image and video generation
-- web fetch and web search
-- memory embedding providers
-- gateway handlers and HTTP routes
-- services and CLI commands
+---
 
-### `src/plugin-sdk/`
+## 五、主要子模块 / Major Subsystems
 
-This is the **public contract** between core and plugins.
+## 1. CLI / Commands
 
-The repository's own boundary documentation is explicit: plugin authors should consume `openclaw/plugin-sdk/*`, not private internals under `src/channels/**`, `src/plugins/**`, or `src/agents/**`.
+`src/cli/` 和 `src/commands/` 负责命令入口与命令语义实现。它们本身不是运行时核心，但它们是操作员与系统交互的重要表面。
 
-The root `package.json` exports a very large set of `./plugin-sdk/*` subpaths, which shows that OpenClaw is intentionally maintaining a wide, named host API for bundled and third-party extensions.
+`src/cli/` and `src/commands/` handle operator-facing entry and command semantics. They are not the runtime core, but they are an important control surface.
 
-This split is crucial:
+## 2. Channels
 
-- `src/plugins/` = host-owned loading and registry internals
-- `src/plugin-sdk/` = stable plugin-facing seam
+Channels 是一等能力，但实现分成两层：
 
-## Major subsystem breakdown
+- core 内部 channel 支撑
+- plugin-owned channel behavior
 
-## CLI and command surfaces
+Channels are first-class capabilities, with a split between internal channel support and plugin-owned channel behavior.
 
-### `src/cli/`
+## 3. Hooks
 
-This layer owns command-line parsing and top-level command registration.
-
-It starts or configures core runtime surfaces such as:
-
-- gateway
-- node/device commands
-- plugins
-- models
-- channels
-- TUI
-- secrets and security tooling
-
-### `src/commands/`
-
-This layer sits one step deeper than CLI parsing. It implements command semantics:
-
-- `agent`
-- `channels`
-- `configure`
-- `doctor`
-- `gateway-status`
-- `models`
-- `auth-choice`
-- `flows`
-
-The practical difference is:
-
-- `cli/` maps argv into actions
-- `commands/` performs the actual orchestration against config, plugins, gateway, and runtime
-
-## Channel system
-
-OpenClaw treats channels as first-class architecture, but the implementation is split between internal channel core and plugin-owned channel logic.
-
-The boundary docs in `src/channels/AGENTS.md` state that `src/channels/**` is internal core implementation and that extensions should go through the plugin SDK channel contracts instead.
-
-The current architecture looks like this:
-
-- core owns shared message tool hosting, bookkeeping, and dispatch
-- channel plugins own platform-specific action discovery and execution
-- routing and session identity are passed into channel-owned execution seams
-
-This lets OpenClaw preserve one core message surface while still supporting channel-specific behavior for Telegram, Slack, Discord, WhatsApp, Matrix, and others.
-
-## Auto-reply and message dispatch
-
-`src/auto-reply/` is where inbound messages become runtime work.
-
-That layer resolves:
-
-- whether a message should trigger a reply
-- which session/account/agent should receive it
-- how to invoke the agent runtime
-- how to shape the outbound reply
-
-Architecturally, it is the bridge from channel ingress to agent execution.
-
-## Hooks
-
-`src/hooks/` provides lifecycle extensibility.
-
-This layer allows custom behavior around events such as:
+Hooks 让插件和宿主生命周期之间形成可插拔接缝，例如：
 
 - before agent start
-- before model resolution
 - before tool call
-- installation/setup lifecycle
 - after tool execution
-- prompt mutation and safety checks
+- prompt mutation
 
-That makes OpenClaw more than a plugin registry. It is also an event-driven extensibility host.
+Hooks create pluggable seams around lifecycle events such as before agent start, before tool call, after tool execution, and prompt mutation.
 
-## Configuration, secrets, security, and runtime substrate
-
-The runtime substrate lives mostly across:
-
-- `src/config/`
-- `src/secrets/`
-- `src/security/`
-- `src/process/`
-- `src/cron/`
-- `src/logging/`
-- `src/runtime.ts`
-- `src/global-state.ts`
-
-These modules form the operational base layer of the platform.
-
-### Config
-
-The config system supports:
-
-- runtime snapshots
-- schema validation
-- config IO and mutation
-- plugin-aware validation and schema expansion
-
-### Secrets
-
-The secrets layer supports multiple secret sources:
-
-- environment variables
-- files
-- command execution
-
-That allows the same core runtime to work in local, server, or more locked-down deployments.
-
-### Security
-
-The security subsystem includes:
-
-- config audits
-- dangerous tool/config detection
-- filesystem and channel security checks
-- safe execution policy helpers
-- auth and rate-limit support inside the Gateway
-
-### Process and cron infrastructure
-
-OpenClaw also includes its own runtime support for:
-
-- supervised child processes
-- PTY-backed processes
-- command queues and kill-tree support
-- cron-like scheduled service behavior
-- structured subsystem logging
-
-This makes the project feel more like an application platform than a single-purpose bot.
-
-## Product and integration surfaces
-
-## 1. Extensions ecosystem
-
-`extensions/` is the bundled capability ecosystem.
-
-The extensions break down into several broad groups.
-
-### Channel and messaging plugins
-
-Examples:
-
-- `telegram`
-- `slack`
-- `discord`
-- `feishu`
-- `signal`
-- `matrix`
-- `mattermost`
-- `msteams`
-- `line`
-- `qqbot`
-- `zalo`
-- `nextcloud-talk`
-
-These provide inbound/outbound platform integration, account setup, pairing, and message delivery behavior.
-
-### Model and provider plugins
-
-Examples:
-
-- `openai`
-- `anthropic`
-- `google`
-- `deepseek`
-- `openrouter`
-- `ollama`
-- `mistral`
-- `groq`
-- `qwen`
-- `minimax`
-- `moonshot`
-- `xai`
-- `amazon-bedrock`
-- `anthropic-vertex`
-- `litellm`
-
-These register text inference and other AI capability providers.
-
-### Multimodal and media plugins
-
-Examples:
-
-- `browser`
-- `speech-core`
-- `media-understanding-core`
-- `image-generation-core`
-- `video-generation-core`
-- `voice-call`
-- `elevenlabs`
-- `deepgram`
-- `fal`
-
-These implement browser automation, speech, TTS/STT, media understanding, image/video generation, and telephony-related features.
-
-### Search, crawl, and tooling plugins
-
-Examples:
-
-- `exa`
-- `firecrawl`
-- `brave`
-- `duckduckgo`
-- `searxng`
-- `tavily`
-- `diffs`
-- `diagnostics-otel`
-
-### Memory and knowledge plugins
-
-Examples:
-
-- `memory-core`
-- `memory-lancedb`
-- `open-prose`
-- `synthetic`
-
-Together these show that `extensions/` is not a small add-on area. It is the practical capability surface of the platform.
-
-## 2. Internal support packages
-
-`packages/` currently serves a narrower support role.
-
-Important packages include:
-
-| Package | Role |
-| --- | --- |
-| `plugin-package-contract` | internal package/manifest contract support |
-| `memory-host-sdk` | reusable SDK for memory-related host functionality |
-| `clawdbot` | compatibility shim forwarding to `openclaw` |
-| `moltbot` | compatibility shim forwarding to `openclaw` |
-
-This indicates that some subsystems, especially memory and plugin packaging, are being treated as reusable internal products.
-
-## 3. Control UI
-
-相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
-
-The web UI under `ui/` is built with:
-
-- Vite
-- Lit
-- Markdown rendering and sanitization support
-- Playwright/Vitest-based testing
-
-It is not the system center. It is a **browser client of the Gateway**.
-
-The corresponding backend glue lives in:
-
-- `src/gateway/control-ui.ts`
-- `src/gateway/server-http.ts`
-
-Its role is operational visibility and control: chat, sessions, nodes, config, logs, and debugging.
-
-## 4. Native clients and shared Apple SDK
-
-相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
-
-### `apps/android`
-
-Android is a native client/node surface.
-
-It is built with Kotlin/Gradle and acts as a paired mobile node that connects to the Gateway and exposes device capabilities.
-
-### `apps/ios`
-
-iOS is a Swift/SwiftUI client with app, share extension, widget, and watch-related targets. It connects to the same Gateway control plane.
-
-### `apps/macos`
-
-macOS includes a desktop app, CLI, IPC library, and discovery support. It depends on shared Apple-side packages rather than duplicating protocol logic.
-
-### `apps/shared/OpenClawKit`
-
-This shared Apple package exports:
-
-- `OpenClawProtocol`
-- `OpenClawKit`
-- `OpenClawChatUI`
-
-That means the Apple clients share both protocol models and reusable UI/runtime code.
-
-## 5. Swabble
-
-相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
-
-`Swabble/` is a separate Swift project with:
-
-- `Swabble`
-- `SwabbleKit`
-- `swabble` CLI
-
-It appears to cover local wake-word / speech-related functionality that can be reused by Apple-side products.
-
-## Inter-module relationships
-
-The system relationships can be summarized like this:
-
-```mermaid
-flowchart TD
-  CLI[CLI / Commands]
-  UI[Web UI]
-  APPS[Native Apps]
-  CH[Channels]
-  ACP[ACP / External clients]
-
-  CLI --> GW[Gateway]
-  UI --> GW
-  APPS --> GW
-  CH --> GW
-  ACP --> GW
-
-  GW --> SR[Sessions + Routing]
-  SR --> AG[Agent Runtime]
-  AG --> PL[Plugin Host]
-  PL --> SDK[Plugin SDK Boundary]
-  SDK --> EXT[Extensions]
-
-  AG --> HO[Hooks]
-  AG --> TOOLS[Tools / Process Hosts / Media]
-  GW --> PROTO[Gateway Protocol]
-  PROTO --> APPS
-```
-
-The most important relationships are:
-
-### Gateway ↔ sessions/routing
-
-The Gateway receives inbound work, but it relies on sessions and routing to decide who owns that work and where it belongs.
-
-### Sessions/routing ↔ agents
-
-Once session/account identity is resolved, the agent runtime executes inside that context.
-
-### Plugins ↔ gateway and agents
-
-Plugins extend both sides of the system:
-
-- Gateway-facing surfaces such as routes, methods, services, channel adapters
-- Agent-facing surfaces such as tools, providers, memory, and multimodal capabilities
-
-### Plugin SDK ↔ extensions
-
-The plugin SDK is the formal seam that keeps the core host separate from plugin implementation details.
-
-### UI/native clients ↔ Gateway protocol
-
-The browser UI and native apps do not reach into core runtime internals. They connect through protocol and control-plane seams exposed by the Gateway.
-
-## Architectural character
+## 4. Runtime Substrate
 
 运行时底座深挖 / Runtime substrate deep dive: [openclaw-runtime-substrate-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-runtime-substrate-deep-dive.md)
 
-OpenClaw shows several strong design preferences.
+`config`、`secrets`、`security`、`process`、`cron`、`logging` 共同构成运行时地基。它们不直接做业务，但决定整个平台是否稳定、可控、可观测。
 
-### 1. Platform-first design
+`config`, `secrets`, `security`, `process`, `cron`, and `logging` together form the runtime foundation. They do not directly implement product features, but they determine whether the platform is stable, controllable, and observable.
 
-The codebase is organized like a host platform with contracts and registries, not like a single monolithic app.
+---
 
-### 2. Explicit public boundaries
+## 六、产品表面 / Product Surfaces
 
-The plugin SDK and Gateway protocol are both treated as public contracts. This reduces accidental coupling and makes the repository friendlier to ecosystem growth.
+## 1. Web UI
 
-### 3. Manifest-first plugin strategy
+相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
 
-Discovery and validation are intentionally separated from full runtime import. That allows OpenClaw to inspect plugins, validate config, and build operator UX before fully executing plugin code.
+`ui/` 是浏览器 Control UI。它不是独立后端，而是 Gateway 的浏览器客户端。
 
-### 4. Gateway-centric control model
+`ui/` is the browser Control UI. It is not an independent backend; it is a browser client of the Gateway.
 
-The Gateway is the place where channels, nodes, clients, sessions, auth, and event streams converge. That centralization simplifies control but also makes the Gateway a heavy critical subsystem.
+## 2. Native Apps + OpenClawKit
 
-### 5. Broad capability model
+相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
 
-The plugin architecture is intentionally broad. Plugins can own text, speech, realtime, channels, browser flows, memory, web fetch/search, image generation, and more.
+`apps/` 下有 Android / iOS / macOS，`apps/shared/OpenClawKit` 则是 Apple 侧共享协议、运行时和 UI 层。这说明客户端不是附属物，而是整个体系的重要组成部分。
 
-## Final assessment
+`apps/` contains Android / iOS / macOS, while `apps/shared/OpenClawKit` provides shared Apple-side protocol, runtime, and UI foundations. This shows that clients are a core part of the architecture, not an afterthought.
 
-OpenClaw is a **plugin-hosted, multi-channel AI Gateway platform**.
+## 3. Swabble
 
-Its central technical framework is made of:
+相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
 
-1. a **Gateway control plane**
-2. an **agent execution runtime**
-3. a **session/routing state layer**
-4. a **plugin host plus public SDK contract**
-5. a **wide bundled ecosystem of channels, providers, and multimodal capabilities**
+`Swabble/` 更偏本地语音唤醒和 voice companion 能力，是 OpenClaw 本地语音入口的一部分补充。
 
-Everything else in the repository — web UI, native apps, memory packages, compatibility shims, and voice/wake-word support — hangs off that spine.
+`Swabble/` is more focused on local wake-word and voice-companion behavior, acting as part of OpenClaw’s local voice-entry surface.
 
-That makes the repository architecturally closer to a small extensible operating environment for AI agents than to a single-purpose assistant app.
+---
+
+## 七、模块之间的关系 / How the Subsystems Relate
+
+可以把 OpenClaw 理解成下面这张逻辑图：
+
+You can think of OpenClaw using the following logical picture:
+
+```text
+Clients / Channels / Hooks / External Requests
+  -> Gateway
+  -> Sessions + Routing + Auto-Reply
+  -> Agent Runtime
+  -> Plugins / Providers / Tools / Media
+  -> Outbound Channels / Nodes / Clients
+```
+
+其中最重要的关系是：
+
+- **Gateway ↔ Sessions/Routing**：控制面把请求交给正确的会话和 agent
+- **Sessions/Routing ↔ Agents**：中间层把上下文变成可执行的 runtime 工作
+- **Agents ↔ Plugins**：执行面通过插件化能力获得模型、工具、渠道、媒体扩展
+- **Gateway ↔ Clients**：所有外部表面都通过控制面接入
+
+The key relationships are the Gateway-to-session handoff, the session-to-agent handoff, the agent-to-plugin capability handoff, and the Gateway-to-client boundary.
+
+---
+
+## 八、架构性格 / Architectural Character
+
+OpenClaw 的架构性格很鲜明：
+
+1. **平台化 / platform-first**：不是单应用，而是宿主 + 能力生态
+2. **边界明确 / boundary-conscious**：Gateway protocol 和 Plugin SDK 都是正式边界
+3. **manifest-first**：插件先看 manifest，再做 validation，再装载
+4. **多端原生 / multi-surface native support**：Web、CLI、iOS、Android、macOS、nodes 都是正式参与者
+5. **运行时治理强 / operationally serious**：config、安全、process、cron、logging 都是架构一部分
+
+OpenClaw is platform-first, boundary-conscious, manifest-first, multi-surface, and operationally serious.
+
+---
+
+## 九、这份总览之后该读什么 / What to Read Next
+
+如果你只想继续读最值的下一篇，按目标选：
+
+Choose the next document based on your goal:
+
+- **想继续看整体** → [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+- **想按目录读源码** → [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)
+- **想看运行时主链** → [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
+- **想深挖控制面** → [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md)
+- **想深挖执行面** → [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md)
+- **想看全部导航** → [openclaw-doc-index-and-reading-paths.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-doc-index-and-reading-paths.md)
+
+---
+
+## 十、结论 / Final Assessment
+
+所以，OpenClaw 最合适的整体定义是：
+
+**一个以 Gateway 为中枢、以 Agent Runtime 为执行核心、以 Plugin SDK 为扩展边界、以多客户端/多节点/多渠道为产品表面的 AI 平台型系统。**
+
+The most accurate overall description of OpenClaw is:
+
+**a Gateway-centered AI platform with an Agent Runtime execution core, a Plugin SDK extension boundary, and multiple client/node/channel product surfaces.**
+
+这份文档的作用，不是替代后续深挖，而是先给读者一个足够稳定的“全局心智模型”。有了这个模型，再读后面的深挖文档，就不会迷路。
+
+This document does not replace the deeper docs. Its job is to give readers a stable global mental model, so that the deeper subsystem guides do not feel disorienting.
