@@ -20,27 +20,27 @@ The repository currently contains the following documents:
 
 | 文档 | 作用 |
 | --- | --- |
-| `openclaw-source-architecture-survey.md` | 系统总览，帮助建立 OpenClaw 的整体认知 |
-| `openclaw-source-guide.md` | 从目录和关键文件入手的源码导读 |
-| `openclaw-layered-architecture.md` | 用四层图解释 OpenClaw 的整体分层 |
+| [openclaw-source-architecture-survey.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-architecture-survey.md) | 系统总览，帮助建立 OpenClaw 的整体认知 |
+| [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md) | 从目录和关键文件入手的源码导读 |
+| [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md) | 用四层图解释 OpenClaw 的整体分层 |
 
 ### B. 子系统深挖 / Subsystem Deep Dives
 
 | 文档 | 作用 |
 | --- | --- |
-| `openclaw-gateway-deep-dive.md` | 深挖 Gateway 控制面 |
-| `openclaw-agents-deep-dive.md` | 深挖 Agent Runtime 执行面 |
-| `openclaw-plugin-system-deep-dive.md` | 深挖 Plugin System 与 SDK 边界 |
-| `openclaw-sessions-routing-auto-reply-deep-dive.md` | 深挖中间编排层：sessions / routing / auto-reply |
-| `openclaw-ui-platform-deep-dive.md` | 深挖 Web UI、原生客户端、OpenClawKit 与 Swabble |
-| `openclaw-runtime-substrate-deep-dive.md` | 深挖配置、安全、进程、调度、日志等运行时底座 |
+| [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md) | 深挖 Gateway 控制面 |
+| [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md) | 深挖 Agent Runtime 执行面 |
+| [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md) | 深挖 Plugin System 与 SDK 边界 |
+| [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md) | 深挖中间编排层：sessions / routing / auto-reply |
+| [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md) | 深挖 Web UI、原生客户端、OpenClawKit 与 Swabble |
+| [openclaw-runtime-substrate-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-runtime-substrate-deep-dive.md) | 深挖配置、安全、进程、调度、日志等运行时底座 |
 
 ### C. 运行链与导航 / Flows and Navigation
 
 | 文档 | 作用 |
 | --- | --- |
-| `openclaw-execution-flows.md` | 以时序和 handoff 解释关键执行链 |
-| `openclaw-doc-index-and-reading-paths.md` | 当前这份总导航 |
+| [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md) | 以时序和 handoff 解释关键执行链 |
+| [openclaw-doc-index-and-reading-paths.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-doc-index-and-reading-paths.md) | 当前这份总导航 |
 
 ---
 
@@ -50,9 +50,9 @@ The repository currently contains the following documents:
 
 读这三篇：
 
-1. `openclaw-source-architecture-survey.md`
-2. `openclaw-layered-architecture.md`
-3. `openclaw-source-guide.md`
+1. [openclaw-source-architecture-survey.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-architecture-survey.md)
+2. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+3. [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)
 
 Read these three if you want the fast mental model.
 
@@ -60,11 +60,11 @@ Read these three if you want the fast mental model.
 
 读这五篇：
 
-1. `openclaw-gateway-deep-dive.md`
-2. `openclaw-sessions-routing-auto-reply-deep-dive.md`
-3. `openclaw-agents-deep-dive.md`
-4. `openclaw-runtime-substrate-deep-dive.md`
-5. `openclaw-execution-flows.md`
+1. [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md)
+2. [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md)
+3. [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md)
+4. [openclaw-runtime-substrate-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-runtime-substrate-deep-dive.md)
+5. [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
 
 Read these five if you want the runtime internals and end-to-end behavior.
 
@@ -72,9 +72,9 @@ Read these five if you want the runtime internals and end-to-end behavior.
 
 读这三篇：
 
-1. `openclaw-plugin-system-deep-dive.md`
-2. `openclaw-layered-architecture.md`
-3. `openclaw-execution-flows.md`
+1. [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md)
+2. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+3. [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
 
 Read these three if your goal is plugin/SDK and extension understanding.
 
@@ -98,8 +98,8 @@ Best for first-time readers who want a mental model in under 30 minutes.
 
 推荐顺序：
 
-1. `openclaw-source-architecture-survey.md`
-2. `openclaw-layered-architecture.md`
+1. [openclaw-source-architecture-survey.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-architecture-survey.md)
+2. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
 
 ## Persona 2：架构理解型 / Architecture Reader
 
@@ -108,10 +108,10 @@ Best for readers who want to understand structure, modules, layering, and bounda
 
 推荐顺序：
 
-1. `openclaw-source-architecture-survey.md`
-2. `openclaw-source-guide.md`
-3. `openclaw-layered-architecture.md`
-4. `openclaw-doc-index-and-reading-paths.md`
+1. [openclaw-source-architecture-survey.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-architecture-survey.md)
+2. [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)
+3. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+4. [openclaw-doc-index-and-reading-paths.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-doc-index-and-reading-paths.md)
 
 ## Persona 3：运行时 internals 型 / Runtime Internals Reader
 
@@ -120,11 +120,11 @@ Best for readers who want to understand inbound handling, agent execution, and o
 
 推荐顺序：
 
-1. `openclaw-gateway-deep-dive.md`
-2. `openclaw-sessions-routing-auto-reply-deep-dive.md`
-3. `openclaw-agents-deep-dive.md`
-4. `openclaw-runtime-substrate-deep-dive.md`
-5. `openclaw-execution-flows.md`
+1. [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md)
+2. [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md)
+3. [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md)
+4. [openclaw-runtime-substrate-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-runtime-substrate-deep-dive.md)
+5. [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
 
 ## Persona 4：插件 / 扩展开发型 / Plugin and Extension Reader
 
@@ -133,10 +133,10 @@ Best for readers preparing to build plugins or understand the plugin host and SD
 
 推荐顺序：
 
-1. `openclaw-plugin-system-deep-dive.md`
-2. `openclaw-source-guide.md`（extensions 部分）
-3. `openclaw-layered-architecture.md`
-4. `openclaw-execution-flows.md`
+1. [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md)
+2. [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)（extensions 部分）
+3. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+4. [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
 
 ## Persona 5：平台 / 客户端型 / Platform and Client Reader
 
@@ -145,9 +145,9 @@ Best for readers focused on UI, iOS, Android, macOS, OpenClawKit, or Swabble.
 
 推荐顺序：
 
-1. `openclaw-ui-platform-deep-dive.md`
-2. `openclaw-layered-architecture.md`
-3. `openclaw-source-guide.md`（ui/apps 部分）
+1. [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
+2. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+3. [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)（ui/apps 部分）
 
 ---
 
@@ -159,13 +159,13 @@ Some documents are strongest when cross-read:
 
 | 从 / From | 到 / To | 为什么 / Why |
 | --- | --- | --- |
-| `openclaw-source-architecture-survey.md` | `openclaw-layered-architecture.md` | 一个给结构总览，一个给图形化分层 |
-| `openclaw-source-guide.md` | 所有深挖文档 | 前者告诉你从哪读，后者告诉你读深了会看到什么 |
-| `openclaw-gateway-deep-dive.md` | `openclaw-sessions-routing-auto-reply-deep-dive.md` | Gateway 和中间编排层是连续链路 |
-| `openclaw-sessions-routing-auto-reply-deep-dive.md` | `openclaw-agents-deep-dive.md` | 中间层与执行面紧密衔接 |
-| `openclaw-plugin-system-deep-dive.md` | `openclaw-execution-flows.md` | 一个讲边界，一个讲装载激活链 |
-| `openclaw-ui-platform-deep-dive.md` | `openclaw-layered-architecture.md` | 一个讲产品表面，一个讲分层位置 |
-| `openclaw-runtime-substrate-deep-dive.md` | `openclaw-agents-deep-dive.md` | 底层支撑执行面 |
+| [openclaw-source-architecture-survey.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-architecture-survey.md) | [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md) | 一个给结构总览，一个给图形化分层 |
+| [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md) | 所有深挖文档 | 前者告诉你从哪读，后者告诉你读深了会看到什么 |
+| [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md) | [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md) | Gateway 和中间编排层是连续链路 |
+| [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md) | [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md) | 中间层与执行面紧密衔接 |
+| [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md) | [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md) | 一个讲边界，一个讲装载激活链 |
+| [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md) | [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md) | 一个讲产品表面，一个讲分层位置 |
+| [openclaw-runtime-substrate-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-runtime-substrate-deep-dive.md) | [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md) | 底层支撑执行面 |
 
 ---
 
@@ -173,21 +173,21 @@ Some documents are strongest when cross-read:
 
 ## 最少 2 篇：建立整体认知 / Minimal 2 docs
 
-1. `openclaw-source-architecture-survey.md`
-2. `openclaw-layered-architecture.md`
+1. [openclaw-source-architecture-survey.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-architecture-survey.md)
+2. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
 
 ## 最少 4 篇：理解主运行链 / Minimal 4 docs for runtime understanding
 
-1. `openclaw-gateway-deep-dive.md`
-2. `openclaw-sessions-routing-auto-reply-deep-dive.md`
-3. `openclaw-agents-deep-dive.md`
-4. `openclaw-execution-flows.md`
+1. [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md)
+2. [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md)
+3. [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md)
+4. [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
 
 ## 最少 3 篇：理解扩展机制 / Minimal 3 docs for extension understanding
 
-1. `openclaw-plugin-system-deep-dive.md`
-2. `openclaw-layered-architecture.md`
-3. `openclaw-execution-flows.md`
+1. [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md)
+2. [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+3. [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
 
 ---
 
