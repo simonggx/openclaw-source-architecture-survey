@@ -1,280 +1,393 @@
-# OpenClaw Source Guide
+# OpenClaw 源码导读版 / OpenClaw Source Guide
 
-This guide is a more detailed, directory-oriented walkthrough of the OpenClaw source tree. It is meant for readers who already have the high-level architecture summary and now want to understand where the most important implementation lives.
+这份文档是 **源码导读版**，目标不是把所有文件都列出来，而是回答三个更有用的问题：
 
-It is not a complete file index. Instead, it focuses on the directories and files that most strongly explain how OpenClaw works.
+1. **先看哪里** / Where to start
+2. **每个关键文件是干什么的** / What each key file does
+3. **它依赖谁、又被谁依赖** / What depends on what
 
-## Reading order
+如果你已经看过总览调研，这份文档就是下一步。
 
-If you are new to the codebase, this order gives the fastest path to understanding:
+If you have already read the high-level survey, this guide is the practical next step.
 
-1. root entrypoints and workspace files
-2. `src/gateway/`
-3. `src/agents/`
-4. `src/sessions/`, `src/routing/`, and `src/auto-reply/`
-5. `src/plugins/` and `src/plugin-sdk/`
-6. `extensions/`
-7. `ui/`
-8. `apps/` and `Swabble/`
-9. `src/config/`, `src/security/`, `src/process/`, `src/logging/`
+---
 
-## 1. Root-level files
+## 一、推荐阅读顺序 / Recommended Reading Order
 
-These are the best root files to read before descending into the tree.
+## 第一轮：先建立全局骨架 / Pass 1: build the global skeleton
 
-| File | Why it matters |
-| --- | --- |
-| `package.json` | Defines the monorepo root package, exported plugin SDK subpaths, scripts, and the published surface of OpenClaw. |
-| `pnpm-workspace.yaml` | Shows the real workspace boundaries: root package, `ui`, `packages/*`, and `extensions/*`. |
-| `openclaw.mjs` | CLI launch shim and top-level executable handoff. |
-| `tsdown.config.ts` | Explains how core entrypoints, plugin SDK subpaths, hooks, and bundled plugin entrypoints are built together. |
-| `AGENTS.md` | High-level repository conventions and architecture guidance. |
-| `docs.acp.md` | Useful context for ACP-related architecture and control-plane semantics. |
+1. `package.json`  
+   看发布面、workspace、`plugin-sdk` 导出面。  
+   Read the published surface, workspace assumptions, and `plugin-sdk` exports.
 
-## 2. `src/` — core runtime
+2. `pnpm-workspace.yaml`  
+   确认 monorepo 的真正边界：根包、`ui`、`packages/*`、`extensions/*`。  
+   Confirms the true monorepo boundaries.
 
-`src/` is the center of the product. It contains the runtime, gateway, agent engine, plugin host, config/security substrate, and many shared facilities.
+3. `tsdown.config.ts`  
+   看构建图如何把 core entrypoints、plugin SDK、bundled plugins、hooks 一起打包。  
+   Shows how core entrypoints, SDK subpaths, bundled plugins, and hooks are built together.
 
-### Key entry files in `src/`
+4. `docs/concepts/architecture.md`  
+   理解 Gateway 是整个系统的控制面。  
+   Establishes Gateway as the system control plane.
 
-| File | Role |
-| --- | --- |
-| `src/entry.ts` | Main startup path for the CLI/runtime process. |
-| `src/index.ts` | Library/root module entrypoint and legacy CLI handoff. |
-| `src/runtime.ts` | Shared runtime abstraction for stdout/logging/error/exit semantics. |
-| `src/global-state.ts` | Small but important process-wide flags and shared runtime state. |
-| `src/extensionAPI.ts` | Bridge for extension-facing runtime integration. |
+## 第二轮：看运行时主链路 / Pass 2: follow the runtime spine
 
-## 3. `src/gateway/` — control plane center
+5. `src/entry.ts`  
+6. `src/index.ts`  
+7. `src/gateway/boot.ts`  
+8. `src/gateway/server-http.ts`  
+9. `src/gateway/protocol/schema.ts`  
+10. `src/sessions/` + `src/routing/`  
+11. `src/agents/`  
+12. `src/auto-reply/`
 
-If you only read one subsystem first, read the Gateway.
+## 第三轮：看扩展边界 / Pass 3: understand the extension seam
 
-This directory is the control plane: the place where clients, nodes, automations, channels, and UI surfaces converge.
+13. `src/plugins/registry.ts`  
+14. `src/plugins/loader.ts`  
+15. `docs/plugins/architecture.md`  
+16. `src/plugin-sdk/index.ts`  
+17. 任选一个 channel plugin + 一个 provider plugin 深读  
+    Read one representative channel plugin and one representative provider plugin.
 
-### Most important files
+## 第四轮：看产品表面 / Pass 4: read product surfaces
 
-| File | Role |
-| --- | --- |
-| `src/gateway/boot.ts` | Bootstraps the Gateway runtime and wires major services together. |
-| `src/gateway/server-http.ts` | HTTP server implementation for APIs, static assets, probes, and Gateway-adjacent routes. |
-| `src/gateway/control-ui.ts` | Serves and configures the browser Control UI. |
-| `src/gateway/protocol/schema.ts` | Typed wire contract for the WebSocket/API boundary. |
-| `src/gateway/channel-health-monitor.ts` | Tracks health and liveness of channel integrations. |
-| `src/gateway/auth*` files | Auth modes, shared-secret handling, trusted ingress, and client validation rules. |
+18. `ui/`
+19. `apps/shared/OpenClawKit/Package.swift`
+20. `apps/ios/`, `apps/android/`, `apps/macos/`
+21. `Swabble/`
 
-### Why this directory matters
+---
 
-The Gateway owns:
+## 二、根目录关键文件 / Key Root Files
 
-- WebSocket sessions for operators and nodes
-- HTTP and API serving
-- control-plane auth and pairing
-- session ingress
-- event broadcasting
-- Control UI hosting
-- protocol validation
+| 文件 / File | 作用（中文） | Role (English) |
+| --- | --- | --- |
+| `package.json` | 根包定义，决定 CLI 入口、导出面、发布内容，尤其是 `./plugin-sdk/*` 子路径。 | Defines the root package, CLI entry, published exports, and especially the `./plugin-sdk/*` surface. |
+| `pnpm-workspace.yaml` | 决定 monorepo 的真正模块边界。 | Defines the actual workspace/module boundaries. |
+| `openclaw.mjs` | CLI 可执行壳，负责把 `openclaw` 命令导入到真正的运行时入口。 | Thin executable wrapper that hands off to the real runtime entry. |
+| `tsdown.config.ts` | 很关键的构建配置；它说明 OpenClaw 不是只编译 `src/`，而是同时考虑 SDK、bundled plugins、hooks。 | Key build graph config showing that core, SDK, hooks, and bundled plugins are packaged together. |
+| `AGENTS.md` | 仓库级约束与边界说明。 | Repository-level architectural and workflow guidance. |
+| `docs.acp.md` | 理解 ACP / control-plane 相关概念的辅助文档。 | Helpful ACP/control-plane context. |
 
-It is the closest thing OpenClaw has to a system kernel.
+### 根目录依赖关系 / Root Dependency View
 
-## 4. `src/agents/` — execution engine
+```text
+package.json
+  -> 决定 published exports / published surface
+pnpm-workspace.yaml
+  -> 决定模块边界 / module boundaries
+tsdown.config.ts
+  -> 决定这些模块如何一起构建 / how those modules build together
+openclaw.mjs
+  -> 进入 CLI/runtime 启动链 / enters CLI/runtime boot chain
+```
 
-This directory is the runtime that actually performs agent work after the Gateway accepts it.
+---
 
-### Most important files and sub-areas
+## 三、`src/` 总入口 / `src/` Core Entry Layer
 
-| File / area | Role |
-| --- | --- |
-| `src/agents/openclaw-tools.ts` | Assembles tool exposure for the runtime. |
-| `src/agents/tool-catalog.ts` | Central catalog for available tools and related metadata. |
-| `src/agents/model-selection.ts` | Resolves which provider/model the agent should use. |
-| `src/agents/auth-profiles.ts` | Handles provider auth profiles and selection logic. |
-| `src/agents/context/` and compaction-related files | Manage prompt/context assembly and long-session reduction. |
-| `src/agents/bash*`, process/tool host files | Handle executable tools, shells, and system-facing actions. |
-| `src/agents/mcp*` and transport-related files | Support MCP/ACP or related external tool/runtime integration. |
+`src/` 是 OpenClaw 的核心运行时；如果 `extensions/` 是能力生态，那么 `src/` 就是宿主内核。
 
-### What to look for here
+### 关键文件 / Key Files
 
-This is where OpenClaw stops being a routing system and becomes an agent runtime:
+| 文件 / File | 作用（中文） | Role (English) |
+| --- | --- | --- |
+| `src/entry.ts` | 主启动入口之一，负责把 CLI/runtime 的初始化接起来。 | Primary startup path for CLI/runtime initialization. |
+| `src/index.ts` | 根模块导出与部分 legacy handoff。 | Root module export surface and legacy entry handoff. |
+| `src/runtime.ts` | 抽象 stdout、stderr、logging、exit 等运行环境能力。 | Shared runtime abstraction for logging/output/exit behavior. |
+| `src/global-state.ts` | 进程级别的小型共享状态，例如 verbose/yes 等标志。 | Small process-wide flags and shared state. |
+| `src/extensionAPI.ts` | extension-facing runtime bridge。 | Bridge between core runtime and extension-facing API. |
 
-- prompt/context construction
-- tool planning and invocation
-- model resolution
-- provider/auth selection
-- execution approvals
-- result streaming and finalization
+### 这一层该怎么读 / How to read this layer
 
-## 5. `src/sessions/`, `src/routing/`, and `src/auto-reply/`
+这一层不要停留太久。它的主要任务是把你引导到真正的核心：
 
-These directories are easier to understand together than separately.
+- Gateway
+- Agent Runtime
+- Plugin Host
+
+Do not overstay here. This layer mainly points you toward the real core: Gateway, Agent Runtime, and Plugin Host.
+
+---
+
+## 四、`src/gateway/` — 控制面核心 / Control Plane Center
+
+如果只挑一个目录先精读，优先 `src/gateway/`。
+
+If you only choose one directory to read deeply first, choose `src/gateway/`.
+
+### 关键文件逐个解释 / File-by-File Guide
+
+| 文件 / File | 中文解释 | English explanation |
+| --- | --- | --- |
+| `src/gateway/boot.ts` | Gateway 启动期逻辑，处理 boot session、BOOT.md 检查、启动前后的会话映射恢复。它说明 Gateway 不只是 server，还会参与启动期控制流程。 | Startup-time Gateway logic for boot sessions, BOOT.md handling, and session mapping restore. Shows Gateway is more than a plain server. |
+| `src/gateway/server-http.ts` | HTTP/HTTPS 入口总装配文件，串起 OpenAI-compatible HTTP、OpenResponses、Control UI、hooks、plugin routes、canvas、session history 等。它基本是 Gateway 的外部门面。 | Central HTTP/HTTPS assembly file that wires OpenAI-compatible APIs, OpenResponses, Control UI, hooks, plugin routes, canvas, and session history. |
+| `src/gateway/control-ui.ts` | 浏览器 Control UI 的静态资源、根页面和配套状态装配。 | Serves and configures the browser Control UI. |
+| `src/gateway/protocol/schema.ts` | WebSocket / API 协议的强类型合同；这是客户端、节点、控制面之间的公共边界。 | Typed contract for the WebSocket/API protocol boundary. |
+| `src/gateway/server-methods.ts` | Gateway 方法注册与调度的核心入口之一。 | One of the central method registration/dispatch files. |
+| `src/gateway/server-chat.ts` | Gateway 侧聊天入口，连接会话、事件、聊天流。 | Gateway-side chat entry that links sessions and chat flow. |
+| `src/gateway/server-plugin-bootstrap.ts` | Gateway 启动时如何引入和接通 plugins。 | Shows how Gateway bootstraps and exposes plugins. |
+| `src/gateway/node-registry.ts` | 节点/设备注册表，连接移动端和远程节点能力。 | Registry for mobile/remote node capabilities. |
+| `src/gateway/channel-health-monitor.ts` | 渠道健康状态监控。 | Tracks channel health and liveness. |
+| `src/gateway/auth.ts` | Gateway 认证主逻辑。 | Primary Gateway auth logic. |
+
+### 依赖链 / Dependency Chains
+
+#### 链路 A：HTTP 入口链 / HTTP ingress chain
+
+```text
+server-http.ts
+  -> auth.ts / http-utils.ts
+  -> control-ui.ts / openai-http.ts / openresponses-http.ts
+  -> server-methods.ts / plugin routes / session endpoints
+```
+
+#### 链路 B：启动链 / boot chain
+
+```text
+entry.ts
+  -> gateway/boot.ts
+  -> server-startup.ts / server-http.ts / plugin bootstrap
+```
+
+#### 链路 C：协议链 / protocol chain
+
+```text
+protocol/schema.ts
+  -> Gateway runtime validates requests
+  -> clients and nodes consume the same contract
+```
+
+### 为什么先看它 / Why read it early
+
+因为 Gateway 是 OpenClaw 的 **控制面总线**：
+
+- 客户端从这里进入
+- 节点从这里进入
+- channel/plugin route 也从这里接入
+- session / chat / auth / pairing 都经过这里
+
+Gateway is the control-plane bus where clients, nodes, chat, auth, pairing, and plugin routes converge.
+
+---
+
+## 五、`src/agents/` — 执行面核心 / Execution Plane Core
+
+这个目录决定“系统如何真正完成一次 agent run”。
+
+This directory answers how the system actually performs an agent run.
+
+### 关键文件逐个解释 / File-by-File Guide
+
+| 文件 / File | 中文解释 | English explanation |
+| --- | --- | --- |
+| `src/agents/openclaw-tools.ts` | 组织 OpenClaw 运行时可见的 tools，是 runtime 能力暴露的核心入口之一。 | One of the main assembly points for runtime-visible tools. |
+| `src/agents/tool-catalog.ts` | tool catalog，决定工具如何被描述、发现、暴露。 | Central tool catalog and exposure model. |
+| `src/agents/model-selection.ts` | 决定 provider/model 选择，是“问哪个模型”的关键文件。 | Core model/provider selection logic. |
+| `src/agents/auth-profiles.ts` | 处理 provider auth profiles、轮换、优先级等。 | Handles provider auth profiles, ordering, and rotation. |
+| `src/agents/compaction.ts` | 长对话压缩逻辑，是上下文工程的重要文件。 | Context compaction for long conversations. |
+| `src/agents/context.ts` | 上下文构建主入口之一。 | One of the main context-assembly entrypoints. |
+| `src/agents/bash-tools.ts` | Bash 工具能力的顶层聚合入口。 | Top-level Bash tool aggregation. |
+| `src/agents/bash-tools.exec-runtime.ts` | bash/exec 运行时执行细节。 | Runtime execution details for bash/exec tools. |
+| `src/agents/mcp-transport.ts` | MCP transport 的关键桥接点。 | Main MCP transport bridge. |
+| `src/agents/agent-command.ts` | agent 命令层与 runtime 的连接点。 | Connects agent commands to the runtime. |
+
+### 依赖链 / Dependency Chains
+
+#### 链路 A：一次 agent run / one agent run
+
+```text
+Gateway request
+  -> sessions/routing
+  -> agent-command.ts or equivalent runtime entry
+  -> context.ts + compaction.ts
+  -> model-selection.ts + auth-profiles.ts
+  -> openclaw-tools.ts + tool-catalog.ts
+  -> final streamed output
+```
+
+#### 链路 B：工具执行 / tool execution
+
+```text
+tool-catalog.ts
+  -> openclaw-tools.ts
+  -> bash-tools.ts / process hosts / plugin tools
+```
+
+### 阅读重点 / Reading Focus
+
+这一层重点看四件事：
+
+1. 上下文怎么组装 / how context is assembled
+2. 模型怎么选 / how model/provider is selected
+3. 工具怎么调 / how tools are invoked
+4. 输出怎么流式返回 / how outputs are streamed back
+
+---
+
+## 六、`src/sessions/`、`src/routing/`、`src/auto-reply/`
+
+这三块最好一起看，因为它们共同构成“消息 → 会话 → 运行”的中间层。
+
+These three areas are best read together because they form the middle layer from inbound message to executable run.
 
 ### `src/sessions/`
 
-This area owns session identity, transcript lifecycle, and continuity.
+- 管 session key / session id
+- 管 transcript 生命周期
+- 管会话连续性
 
-Important files usually include session keys, transcript handling, and session metadata transforms.
+Handles session keys, transcript lifecycle, and continuity.
 
 ### `src/routing/`
 
-This area decides how inbound activity binds to:
+- 决定消息归属到哪个 account / agent / channel / thread / session
 
-- accounts
-- agents
-- channels
-- threads
-- session ids
-
-It is the glue that makes a single Gateway safe for many senders and many channels.
+Resolves which account, agent, channel, thread, and session an event belongs to.
 
 ### `src/auto-reply/`
 
-This area turns inbound messages into runtime work. It decides when a message should trigger an agent reply and how that request is shaped.
+- 决定什么时候应该自动触发 agent reply
+- 决定自动回复的入参如何成形
 
-### Why these directories matter together
+Decides when auto-reply should trigger and how the runtime input is shaped.
 
-Together they implement the path:
+### 关键依赖链 / Key Dependency Chain
 
-**incoming event → route resolution → session binding → agent invocation → outbound reply**
+```text
+inbound message
+  -> routing
+  -> session binding
+  -> auto-reply decision
+  -> agents runtime
+  -> outbound dispatch
+```
 
-## 6. `src/plugins/` — plugin host internals
+---
 
-This directory owns plugin discovery, validation, loading, and registry construction.
+## 七、`src/plugins/` — 插件宿主内部 / Plugin Host Internals
 
-### Most important files
+这一层不是给插件作者看的“公共 API”，而是宿主如何发现、验证、装载、注册插件的内部机制。
 
-| File | Role |
-| --- | --- |
-| `src/plugins/registry.ts` | Defines the real plugin capability surface and aggregates registered behavior. |
-| `src/plugins/loader.ts` | Loads plugin runtime modules and applies manifest-first loading rules. |
-| `src/plugins/runtime*.ts` | Holds runtime-level plugin integration state and helper behavior. |
-| `src/plugins/services.ts` | Integrates long-running plugin services into the host runtime. |
-| `src/plugins/install*` files | Manage plugin installation and local plugin lifecycle. |
+This is not the public extension API. It is the host-side machinery for discovering, validating, loading, and registering plugins.
 
-### What to pay attention to
+### 关键文件逐个解释 / File-by-File Guide
 
-The key idea is that OpenClaw tries to validate and reason about plugins from manifests and metadata before executing plugin code. That is a major architectural choice.
+| 文件 / File | 中文解释 | English explanation |
+| --- | --- | --- |
+| `src/plugins/registry.ts` | 插件注册中心；这里最能看出插件究竟可以注册哪些能力：tools、channels、providers、hooks、services、HTTP routes、gateway handlers 等。 | The registry that reveals the true capability surface plugins can register. |
+| `src/plugins/loader.ts` | 插件装载主逻辑，处理 manifest-first、jiti 动态加载、setup/full runtime 分离、alias 解析等。 | Main plugin loader handling manifest-first logic, jiti loading, setup/full runtime splits, and alias resolution. |
+| `src/plugins/discovery.ts` | 负责发现 candidate plugins。 | Discovers candidate plugins. |
+| `src/plugins/manifest-registry.ts` | 管 manifest 元数据注册和读取。 | Registry for manifest metadata. |
+| `src/plugins/runtime.ts` | 宿主侧运行时插件状态入口之一。 | One of the host runtime entrypoints for plugin state. |
+| `src/plugins/services.ts` | 插件 services 如何接入宿主。 | Connects plugin services into the host. |
+| `src/plugins/cli.ts` | 插件 CLI surface 如何懒加载/注册。 | Plugin CLI registration and lazy-loading path. |
 
-## 7. `src/plugin-sdk/` — public extension boundary
+### 依赖链 / Dependency Chains
 
-This directory is the contract surface between core and plugins.
+#### 链路 A：发现到注册 / discovery to registration
 
-### What it contains
+```text
+discovery.ts
+  -> manifest-registry.ts
+  -> loader.ts
+  -> registry.ts
+  -> runtime/services/commands/routes/tools become visible
+```
 
-The SDK is broken into many narrow subpaths, including areas for:
+#### 链路 B：Gateway 与 plugin route / Gateway and plugin routes
 
-- core plugin registration
-- setup/runtime helpers
-- channels
-- providers
-- config schema/runtime helpers
-- approval and reply runtimes
-- sandbox/runtime support
-- routing/runtime bridges
+```text
+plugins/registry.ts
+  -> gateway handlers / http routes registrations
+  -> gateway/server-http.ts consumes them
+```
 
-### Why it matters
+### 阅读重点 / Reading Focus
 
-The repository explicitly treats this directory as the stable extension seam. If you are studying how OpenClaw wants extension authors to interact with the host, this is the directory to read.
+这里最重要的设计思想是：
 
-## 8. `src/channels/` — internal channel core
+**先从 manifest 和 metadata 推理插件，再决定是否执行插件代码。**
 
-This area is the internal side of channel support.
+The key design idea is: **reason from manifests and metadata first, execute plugin code later.**
 
-It is not the preferred import surface for extensions, but it is where core channel abstractions and some message/session logic live.
+---
 
-### What to focus on
+## 八、`src/plugin-sdk/` — 公共扩展边界 / Public Extension Boundary
 
-- shared message semantics
-- conversation and thread binding rules
-- allowlist and identity handling
-- core-side dispatch helpers
+这一层是给扩展作者看的正式 contract。
 
-This directory becomes clearer after reading the plugin architecture docs, because many channel-specific execution details now live in bundled extension modules instead of core.
+This layer is the formal contract for extension authors.
 
-## 9. `src/hooks/` — lifecycle extensibility
+### 关键文件逐个解释 / File-by-File Guide
 
-Hooks are where behavior can be inserted around important runtime events.
+| 文件 / File | 中文解释 | English explanation |
+| --- | --- | --- |
+| `src/plugin-sdk/index.ts` | 根级 SDK surface。文件本身刻意保持很薄，只暴露公共类型和聚合导出。 | Root SDK surface. Intentionally thin; aggregates stable public exports. |
+| `src/plugin-sdk/core.ts` | 公共核心能力入口之一。 | One of the central shared SDK core entrypoints. |
+| `src/plugin-sdk/plugin-entry.ts` | 插件入口 contract 的关键位置。 | Key contract for plugin entry definition. |
+| `src/plugin-sdk/provider-entry.ts` | provider plugin 的入口合同。 | Entry contract for provider plugins. |
+| `src/plugin-sdk/channel-entry-contract.ts` | channel plugin 的入口合同。 | Entry contract for channel plugins. |
+| `src/plugin-sdk/gateway-runtime.ts` | 供插件接入 Gateway runtime 的桥梁。 | Bridge for plugin access to Gateway runtime. |
+| `src/plugin-sdk/config-runtime.ts` | 配置读取/写入相关 runtime seam。 | Config-related runtime seam. |
+| `src/plugin-sdk/runtime-secret-resolution.ts` | secret resolution 的扩展边界。 | Secret-resolution boundary for plugins. |
 
-### Important responsibilities
+### 依赖链 / Dependency Chains
 
-- before-agent and before-model hooks
-- prompt mutation
-- tool lifecycle hooks
-- install/setup lifecycle hooks
-- compatibility support for older hook-based integrations
+```text
+plugin author code
+  -> plugin-sdk/*
+  -> plugin host (src/plugins/*)
+  -> runtime registry
+```
 
-This subsystem matters because it explains how OpenClaw evolved from pure hook-based extensibility toward explicit capability registration without fully dropping legacy patterns.
+### 你应该如何理解它 / How to interpret it
 
-## 10. `src/config/` and `src/secrets/`
+`src/plugins/` 是 **宿主内部实现**，`src/plugin-sdk/` 是 **宿主对外合同**。
 
-These directories define how OpenClaw is configured and how secrets enter the runtime.
+`src/plugins/` is host internals. `src/plugin-sdk/` is the public host contract.
 
-### `src/config/` key files
+---
 
-| File | Role |
-| --- | --- |
-| `src/config/config.ts` | Main config export and access surface. |
-| `src/config/io.ts` | Heavyweight config loading, caching, runtime snapshots, and file mutation plumbing. |
-| `src/config/paths.ts` | Resolves state/config paths such as `~/.openclaw`. |
-| `src/config/zod-schema.ts` | Full schema for validating the runtime config model. |
-| `src/config/types.*` files | Typed config slices and schema support. |
+## 九、`src/config/`、`src/secrets/`、`src/security/`
+
+这三块共同构成 OpenClaw 的治理底座。
+
+These three areas form the operational governance substrate.
+
+### `src/config/` 关键文件 / Key Files
+
+| 文件 / File | 中文解释 | English explanation |
+| --- | --- | --- |
+| `src/config/config.ts` | config 访问总入口。 | Main config access surface. |
+| `src/config/io.ts` | config 读取、缓存、runtime snapshot、文件变更等重逻辑。 | Heavyweight config IO, caching, runtime snapshots, and mutation plumbing. |
+| `src/config/paths.ts` | 配置和 state 目录路径解析。 | Resolves config/state directory paths. |
+| `src/config/zod-schema.ts` | 配置 schema 核心。 | Main runtime config schema. |
 
 ### `src/secrets/`
 
-This directory resolves secret values into runtime config using environment, file, and command-backed sources.
-
-If you are tracing auth/provider behavior, these files are worth reading early.
-
-## 11. `src/security/`, `src/process/`, `src/logging/`, `src/cron/`
-
-These directories are the operations substrate.
+- 把 env / file / exec 三类 secret source 注入 runtime config  
+- Resolves env/file/exec secret sources into runtime config
 
 ### `src/security/`
 
-Focus on:
-
-- audit entrypoints
-- dangerous tool/config detection
+- audit
+- dangerous config/tool detection
 - filesystem checks
-- channel security checks
-- regex and execution safety helpers
+- trust/auth helpers
 
-### `src/process/`
+---
 
-Focus on:
+## 十、`extensions/` — bundled plugin 生态 / Bundled Plugin Ecosystem
 
-- process supervisor
-- child/PTY adapters
-- cancellation and kill-tree logic
-- command scheduling and execution helpers
+这个目录不建议平铺看。建议按“类别”看。
 
-### `src/logging/` and `src/logger.ts`
+Do not read this directory flat. Read it by category.
 
-Focus on:
-
-- subsystem loggers
-- file transport and retention
-- runtime logging settings
-
-### `src/cron/`
-
-This area handles scheduled/background job behavior and is part of the runtime orchestration substrate rather than the visible user-facing product surface.
-
-## 12. `src/media/`, `src/media-understanding/`, `src/realtime-*`, `src/tts/`, `src/image-generation/`, `src/video-generation/`
-
-These directories are not always where the final provider implementation lives, but they define the core-side contracts and runtime support for multimodal capabilities.
-
-They matter because they show that multimodal support is a first-class platform concept rather than an ad hoc add-on.
-
-## 13. `extensions/` — bundled plugin ecosystem
-
-This directory is huge and should be read as a taxonomy, not as one unit.
-
-### Best way to navigate it
-
-Group extensions by responsibility:
-
-#### Channel plugins
-
-Examples:
+### A. 渠道插件 / Channel Plugins
 
 - `telegram`
 - `slack`
@@ -282,30 +395,19 @@ Examples:
 - `feishu`
 - `signal`
 - `matrix`
-- `mattermost`
-- `msteams`
-- `line`
 - `whatsapp`
-- `zalo`
 
-#### Provider plugins
-
-Examples:
+### B. Provider 插件 / Provider Plugins
 
 - `openai`
 - `anthropic`
 - `google`
 - `deepseek`
 - `openrouter`
-- `mistral`
-- `groq`
 - `qwen`
 - `minimax`
-- `moonshot`
 
-#### Multimodal and voice plugins
-
-Examples:
+### C. 多模态插件 / Multimodal Plugins
 
 - `browser`
 - `speech-core`
@@ -313,112 +415,79 @@ Examples:
 - `image-generation-core`
 - `video-generation-core`
 - `voice-call`
-- `elevenlabs`
-- `deepgram`
 
-#### Search/tooling plugins
+### 每个 extension 里最值得看的文件 / Common Important Files
 
-Examples:
+| 文件 / File | 作用（中文） | Role (English) |
+| --- | --- | --- |
+| `index.ts` | 插件入口，定义 register(api) 逻辑。 | Plugin entrypoint and `register(api)` path. |
+| `api.ts` | extension 本地 API barrel。 | Local API barrel for the extension. |
+| `runtime-api.ts` | 运行时桥接面。 | Runtime bridge surface. |
+| `openclaw.plugin.json` | manifest 元数据。 | Manifest metadata. |
 
-- `exa`
-- `firecrawl`
-- `brave`
-- `duckduckgo`
-- `searxng`
-- `tavily`
+---
 
-### Common files to read inside an extension
+## 十一、`ui/`、`apps/`、`Swabble/` — 产品表面 / Product Surfaces
 
-| File | Role |
-| --- | --- |
-| `index.ts` | Plugin entrypoint and registration path. |
-| `api.ts` | Local API barrel or host-facing helper exports. |
-| `runtime-api.ts` | Runtime-level extension integration surface when present. |
-| `openclaw.plugin.json` | Manifest metadata used during discovery and validation. |
+### `ui/`
 
-Read one or two representative plugins deeply rather than skimming fifty of them.
+这是 Gateway 的浏览器客户端，不是独立后端。  
+This is a browser client of the Gateway, not an independent backend.
 
-## 14. `packages/` — internal support packages
+### `apps/shared/OpenClawKit/Package.swift`
 
-This directory is much smaller than `extensions/`, but still useful.
+这个文件很重要，因为它直接说明 Apple 侧的共享拆分：
 
-### Important packages
+- `OpenClawProtocol`
+- `OpenClawKit`
+- `OpenClawChatUI`
 
-| Package | Role |
-| --- | --- |
-| `packages/plugin-package-contract` | Internal plugin packaging and contract support. |
-| `packages/memory-host-sdk` | Shared memory host SDK. |
-| `packages/clawdbot` | Compatibility shim package. |
-| `packages/moltbot` | Compatibility shim package. |
+This file is important because it shows the Apple-side split into shared protocol, runtime kit, and chat UI.
 
-This directory is best read after the plugin architecture is already clear.
+### `apps/ios/`, `apps/android/`, `apps/macos/`
 
-## 15. `ui/` — browser Control UI
+这些目录是客户端/节点表面，主要通过 Gateway protocol 接系统。  
+These directories are client/node surfaces that mostly connect through the Gateway protocol.
 
-The `ui/` workspace is the main web client for the Gateway.
+### `Swabble/`
 
-### What to focus on
+更偏 Apple 侧语音唤醒/本地语音能力补充。  
+More of an Apple-side wake-word/local voice companion project.
 
-| Area | Role |
-| --- | --- |
-| `ui/package.json` | Shows the frontend stack and test tooling. |
-| `ui/src/` | Actual UI implementation. |
-| gateway-related client files | WebSocket/API communication back to the Gateway. |
-| settings/session/chat screens | Operational product surface for managing the running system. |
+---
 
-This workspace is best understood as a control-plane client, not a standalone app.
+## 十二、总结：最重要的三条主链 / Final Three Core Chains
 
-## 16. `apps/` — native clients
+### 链路 1：控制面主链 / Control Plane Spine
 
-This directory contains the native/mobile surfaces.
+```text
+entry.ts
+  -> gateway/boot.ts
+  -> gateway/server-http.ts
+  -> gateway/protocol/schema.ts
+```
 
-### Subdirectories
+### 链路 2：执行面主链 / Execution Plane Spine
 
-| Path | Role |
-| --- | --- |
-| `apps/android/` | Android client/node. |
-| `apps/ios/` | iOS client/node. |
-| `apps/macos/` | macOS client and related desktop tooling. |
-| `apps/shared/` | Shared Apple-side packages and protocol/UI code. |
+```text
+inbound request
+  -> sessions/routing
+  -> agents/context/model-selection
+  -> tools/process hosts/plugins
+  -> streamed result
+```
 
-### Most important shared file
+### 链路 3：扩展面主链 / Extension Plane Spine
 
-| File | Role |
-| --- | --- |
-| `apps/shared/OpenClawKit/Package.swift` | Shows the shared Apple package split into `OpenClawProtocol`, `OpenClawKit`, and `OpenClawChatUI`. |
+```text
+plugin manifest
+  -> plugins/discovery.ts
+  -> plugins/loader.ts
+  -> plugins/registry.ts
+  -> plugin-sdk/runtime exposure
+  -> extensions become active capabilities
+```
 
-That file is a useful orientation point because it proves the native clients share protocol models and reusable client runtime pieces instead of duplicating them separately.
+如果你按这三条链去读，OpenClaw 这套系统会很快从“目录很多”变成“脊柱清晰”。
 
-## 17. `Swabble/` — wake-word and local voice support
-
-This Swift project appears to support local voice/wake-word behavior and related reusable Apple-side voice capabilities.
-
-It is not the main runtime center, but it is important if you want the full picture of OpenClaw’s Apple-side voice stack.
-
-## 18. `docs/` — public architecture context
-
-When reading source, these docs are especially useful because they encode intended boundaries rather than just current implementation:
-
-| File | Why it matters |
-| --- | --- |
-| `docs/concepts/architecture.md` | Explains the Gateway-centric control-plane model. |
-| `docs/plugins/architecture.md` | Explains plugin discovery, loading, capability ownership, and the message tool boundary. |
-| `docs/gateway/protocol.md` | Helps map protocol schema and WS behavior back to implementation. |
-| `docs/platforms/*` | Adds context for native/macOS/iOS integration areas. |
-
-## Suggested study pass
-
-For a strong first pass through the repo, read in this order:
-
-1. `package.json`, `pnpm-workspace.yaml`, `tsdown.config.ts`
-2. `docs/concepts/architecture.md`
-3. `src/gateway/boot.ts`, `src/gateway/server-http.ts`, `src/gateway/protocol/schema.ts`
-4. `src/agents/` tool/model/runtime files
-5. `src/sessions/`, `src/routing/`, `src/auto-reply/`
-6. `src/plugins/registry.ts`, `src/plugins/loader.ts`
-7. `docs/plugins/architecture.md`
-8. `src/plugin-sdk/`
-9. one representative channel extension and one representative provider extension
-10. `ui/`, `apps/shared/OpenClawKit/Package.swift`, and platform app directories
-
-That sequence preserves the real logic of the system: control plane first, execution plane second, extension seams third, clients last.
+If you read along these three chains, OpenClaw quickly stops feeling like “too many directories” and starts feeling like a clear platform spine.

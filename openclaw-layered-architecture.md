@@ -1,49 +1,56 @@
-# OpenClaw Layered Architecture
+# OpenClaw 分层架构图版 / OpenClaw Layered Architecture
 
-This document presents OpenClaw as a four-layer system:
+这份文档把 OpenClaw 拆成四层：
 
-1. **Control plane**
-2. **Execution plane**
-3. **Extension plane**
-4. **Client plane**
+1. **控制面（Control Plane）**
+2. **执行面（Execution Plane）**
+3. **扩展面（Extension Plane）**
+4. **客户端面（Client Plane）**
 
-This is not the only valid cut, but it is the cleanest one for explaining how the repository behaves as a platform.
+同时，不再只给一张总图，而是拆成四张图：
 
-## Layer overview
+- 总图 / Overall system
+- Gateway 图 / Gateway internals
+- Agent Runtime 图 / Agent runtime internals
+- Plugin System 图 / Plugin system internals
+
+---
+
+## 一、总图 / Overall Architecture
 
 ```mermaid
 flowchart TB
-  subgraph CP[Control Plane]
-    GW[Gateway]
-    PROTO[Gateway Protocol]
-    ACP[ACP / Session Control]
-    CFG[Config + Auth + Pairing]
-  end
-
-  subgraph EP[Execution Plane]
-    AG[Agent Runtime]
-    SES[Sessions + Routing]
-    AR[Auto Reply]
-    TOOLS[Tool Hosts / Process / Media Runtime]
-    FLOWS[Tasks + Flows + Cron]
-  end
-
-  subgraph XP[Extension Plane]
-    PH[Plugin Host]
-    SDK[Plugin SDK]
-    CH[Channel Plugins]
-    PV[Provider Plugins]
-    MM[Media / Search / Memory Extensions]
-    HK[Hooks]
-  end
-
-  subgraph CLP[Client Plane]
+  subgraph CL[客户端面 / Client Plane]
     CLI[CLI / TUI]
     WEB[Web Control UI]
     IOS[iOS]
     ANDROID[Android]
     MAC[macOS]
     NODES[Remote Nodes]
+  end
+
+  subgraph CP[控制面 / Control Plane]
+    GW[Gateway]
+    PROTO[Gateway Protocol]
+    ACP[ACP / Session Control]
+    CFG[Config + Secrets + Pairing + Security]
+  end
+
+  subgraph EP[执行面 / Execution Plane]
+    SES[Sessions + Routing]
+    AR[Auto Reply]
+    AG[Agent Runtime]
+    TOOLS[Tool Hosts + Process + Media Runtime]
+    FLOWS[Tasks + Flows + Cron]
+  end
+
+  subgraph XP[扩展面 / Extension Plane]
+    PH[Plugin Host]
+    SDK[Plugin SDK]
+    CH[Channel Plugins]
+    PV[Provider Plugins]
+    MM[Media/Search/Memory Extensions]
+    HK[Hooks]
   end
 
   CLI --> GW
@@ -53,12 +60,12 @@ flowchart TB
   MAC --> GW
   NODES --> GW
 
-  GW --> SES
-  GW --> PROTO
-  ACP --> SES
   CFG --> GW
+  GW --> PROTO
+  GW --> SES
+  ACP --> SES
 
-  SES --> AG
+  SES --> AR
   AR --> AG
   AG --> TOOLS
   FLOWS --> AG
@@ -75,201 +82,235 @@ flowchart TB
   MM --> AG
 ```
 
-## 1. Control plane
+### 解释 / Explanation
 
-The control plane is the part of OpenClaw that owns system coordination, identity, protocol boundaries, configuration, and ingress.
+- **客户端面** 负责人与设备接入。  
+  The client plane is where humans and devices enter the system.
 
-### Main modules
+- **控制面** 负责 admission、认证、协议、配对、系统边界。  
+  The control plane owns admission, auth, protocol, pairing, and the outer system boundary.
 
-| Module | Why it belongs here |
-| --- | --- |
-| `src/gateway/` | Primary control-plane daemon and ingress surface. |
-| `src/gateway/protocol/` | Wire contract for clients and nodes. |
-| `src/acp/` | Session control, runtime control, and operator/control abstractions. |
-| `src/config/` | Configuration loading, validation, and runtime config state. |
-| `src/secrets/` | Secret resolution for provider and runtime auth. |
-| `src/security/` | Runtime audits, dangerous config/tool checks, and trust enforcement. |
-| `src/pairing/` | Device identity and trust relationships. |
+- **执行面** 负责真正跑一次 agent turn。  
+  The execution plane performs the actual agent turn.
 
-### Responsibilities
+- **扩展面** 提供可插拔能力：channel、provider、media、memory、search。  
+  The extension plane provides pluggable capabilities: channels, providers, media, memory, search.
 
-- accept and authenticate clients and nodes
-- validate protocol frames and requests
-- hold control-plane state
-- expose health, status, and system routes
-- load config and trust settings
-- enforce pairing and ingress policy
+---
 
-### Why Gateway is here, not in execution
+## 二、Gateway 图 / Gateway Architecture
 
-The Gateway triggers execution, but its primary job is orchestration and control-plane mediation. It owns the outer boundary of the running system.
+```mermaid
+flowchart TB
+  CLIENTS[Clients / Nodes / UI / CLI]
+  AUTH[auth.ts + connection-auth + pairing]
+  HTTP[server-http.ts]
+  METHODS[server-methods.ts]
+  CHAT[server-chat.ts]
+  UI[control-ui.ts]
+  PROTO[protocol/schema.ts]
+  PLUGINS[server-plugin-bootstrap.ts + plugin routes]
+  NODES[node-registry.ts + server-node-events.ts]
+  HEALTH[channel-health-monitor.ts]
 
-## 2. Execution plane
-
-The execution plane is the part that performs work once the control plane accepts it.
-
-### Main modules
-
-| Module | Why it belongs here |
-| --- | --- |
-| `src/agents/` | Core agent runtime and tool/model orchestration. |
-| `src/sessions/` | Session identity, transcript state, and continuity. |
-| `src/routing/` | Maps inbound requests to agent/session/account context. |
-| `src/auto-reply/` | Turns inbound events into executable agent work. |
-| `src/tasks/` | Structured runtime task management. |
-| `src/flows/` | Higher-level execution orchestration. |
-| `src/process/` | Tool hosts, child process supervision, PTY integration. |
-| `src/cron/` | Scheduled execution and background work. |
-| `src/media/`, `src/tts/`, `src/realtime-*`, `src/image-generation/`, `src/video-generation/` | Core-side execution support for multimodal operations. |
-
-### Responsibilities
-
-- build runtime context for an agent turn
-- select model/provider/auth profile
-- invoke tools and process hosts
-- stream results and finalize outputs
-- maintain session continuity across turns
-- run task/flow-based execution logic
-
-### Why sessions and routing live here
-
-They are connected to control-plane identity, but their job is to make execution correct. They shape how a concrete run is instantiated, not how a client is admitted.
-
-## 3. Extension plane
-
-The extension plane is the pluggable capability layer. It is how OpenClaw stops being a closed runtime and becomes an ecosystem platform.
-
-### Main modules
-
-| Module | Why it belongs here |
-| --- | --- |
-| `src/plugins/` | Plugin discovery, validation, loading, and registry assembly. |
-| `src/plugin-sdk/` | Public host contract for plugin authors. |
-| `src/channels/` | Internal channel core that supports the wider extension model. |
-| `src/hooks/` | Lifecycle extension points used by plugins and hook-based integrations. |
-| `extensions/` | Bundled ecosystem of channels, providers, media, search, memory, and tooling plugins. |
-| `packages/plugin-package-contract` | Internal package support for plugin packaging/contracts. |
-| `packages/memory-host-sdk` | Shared support package for memory-related extension behavior. |
-
-### Responsibilities
-
-- discover and validate plugins from manifests
-- expose stable SDK seams
-- register capabilities into the runtime
-- let channels, providers, and media/search/memory backends plug into the system
-- keep host internals decoupled from extension-specific logic
-
-### Important architectural idea
-
-The extension plane is not just “extra features.” In OpenClaw, many first-class system capabilities are expected to arrive through plugins. The host is intentionally broad.
-
-## 4. Client plane
-
-The client plane contains the user- and device-facing surfaces that talk to the control plane.
-
-### Main modules
-
-| Module | Why it belongs here |
-| --- | --- |
-| `src/cli/` | Operator-facing command-line client surface. |
-| `src/tui/` | Terminal UI and local operator interactions. |
-| `ui/` | Browser-based Control UI. |
-| `apps/android/` | Android client/node surface. |
-| `apps/ios/` | iOS client/node surface. |
-| `apps/macos/` | macOS app/client surface. |
-| `apps/shared/OpenClawKit` | Shared Apple protocol/runtime/UI client library. |
-| `Swabble/` | Apple-side wake-word/voice companion project. |
-
-### Responsibilities
-
-- provide chat and control interfaces
-- connect to the Gateway over the public protocol
-- expose device/node capabilities from mobile or desktop platforms
-- render settings, session, node, and chat experiences
-
-### Why CLI is placed here
-
-The CLI does trigger execution, but architecturally it behaves as a control-plane client and operator surface. It is a front door into the system rather than the core execution engine itself.
-
-## Cross-layer flows
-
-## Flow 1: operator-initiated agent run
-
-```text
-Client plane (CLI / Web UI / macOS app)
-  → Control plane (Gateway + protocol + auth)
-  → Execution plane (sessions + routing + agents)
-  → Extension plane (providers / tools / channels / hooks)
-  → back through Gateway to the client
+  CLIENTS --> AUTH
+  AUTH --> HTTP
+  HTTP --> UI
+  HTTP --> METHODS
+  HTTP --> CHAT
+  HTTP --> PLUGINS
+  HTTP --> NODES
+  METHODS --> PROTO
+  CHAT --> PROTO
+  PLUGINS --> HEALTH
 ```
 
-## Flow 2: inbound channel message
+### Gateway 的核心职责 / Core Gateway Responsibilities
 
-```text
-Extension plane (channel plugin receives message)
-  → Control plane (Gateway ingress and trust checks)
-  → Execution plane (auto-reply + routing + session + agents)
-  → Extension plane (channel-owned outbound execution)
-  → external messaging platform
-```
-
-## Flow 3: native node capability call
-
-```text
-Client plane (iOS / Android / macOS node)
-  → Control plane (Gateway WS connect + pairing)
-  → Execution plane (agent decides to invoke node capability)
-  → Control plane (Gateway relays request)
-  → Client plane (node performs action and returns result)
-```
-
-## Ambiguous modules and how to present them
-
-Some modules touch more than one layer. For a clear diagram, these are the best placements.
-
-| Module | Touches | Best presentation |
+| 模块 / Module | 中文说明 | English note |
 | --- | --- | --- |
-| `src/gateway/protocol/` | control + client + execution | Present in **control plane** because it is the authoritative contract boundary. |
-| `src/sessions/` and `src/routing/` | control + execution | Present in **execution plane** because they shape concrete runtime work. |
-| `src/channels/` | execution + extension | Present in **extension plane** because channel behavior is part of the pluggable capability surface. |
-| `src/cli/` | client + control + execution | Present in **client plane** because it acts as an operator-facing entry surface. |
-| `src/hooks/` | execution + extension | Present in **extension plane** because it is an extensibility seam, not the main runtime loop itself. |
+| `boot.ts` | 启动控制逻辑，处理 boot session 与 BOOT.md 场景。 | Startup control logic including boot session handling. |
+| `server-http.ts` | HTTP 外部总装配，挂载所有主要入口。 | Main external HTTP assembly point. |
+| `auth.ts` | 处理认证与连接授权。 | Handles authentication and connection authorization. |
+| `control-ui.ts` | 给浏览器 Control UI 提供页面与状态。 | Serves the browser Control UI. |
+| `server-chat.ts` | 管 Gateway 侧聊天入口与事件。 | Gateway-side chat entry and event wiring. |
+| `protocol/schema.ts` | 统一协议合同。 | Unified protocol contract. |
+| `server-plugin-bootstrap.ts` | 把 plugin routes/services/methods 接进 Gateway。 | Connects plugin routes/services/methods into Gateway. |
+| `node-registry.ts` | 移动端和节点能力注册。 | Registers node/mobile capabilities. |
 
-## Formal dependency summary
+### 这张图想表达什么 / What this diagram shows
 
-The clean dependency direction is:
+Gateway 不是“一个 HTTP server 文件夹”，而是整个系统的 **控制面背板（control-plane backplane）**。
 
-```text
-Client plane
-  → Control plane
-  → Execution plane
-  → Extension plane
+Gateway is not just “an HTTP server folder”; it is the control-plane backplane of the system.
+
+---
+
+## 三、Agent Runtime 图 / Agent Runtime Architecture
+
+```mermaid
+flowchart TB
+  INBOUND[Inbound Request / Routed Session]
+  SESSION[sessions + routing]
+  AUTO[auto-reply]
+  CONTEXT[context.ts + compaction.ts]
+  MODEL[model-selection.ts + auth-profiles.ts]
+  TOOLS[openclaw-tools.ts + tool-catalog.ts]
+  EXEC[bash/process/mcp/media runtimes]
+  RESULT[streamed result + final answer]
+
+  INBOUND --> SESSION
+  SESSION --> AUTO
+  AUTO --> CONTEXT
+  CONTEXT --> MODEL
+  MODEL --> TOOLS
+  TOOLS --> EXEC
+  EXEC --> RESULT
 ```
 
-But runtime reality includes controlled feedback loops:
+### Agent Runtime 的核心职责 / Core Agent Runtime Responsibilities
 
-- extension plane sends inbound events back into the control plane
-- control plane relays node/device work back into the client plane
-- execution plane consumes extension capabilities dynamically
+| 模块 / Module | 中文说明 | English note |
+| --- | --- | --- |
+| `src/sessions/` | 会话身份与 transcript 连续性。 | Session identity and transcript continuity. |
+| `src/routing/` | 决定消息落到哪个 account/agent/session。 | Resolves account/agent/session ownership. |
+| `src/auto-reply/` | 决定何时触发自动回复。 | Decides whether auto-reply should trigger. |
+| `context.ts` | 构造当前回合上下文。 | Builds runtime context for the turn. |
+| `compaction.ts` | 长会话压缩。 | Compacts long conversations. |
+| `model-selection.ts` | 选择 provider/model。 | Selects provider/model. |
+| `auth-profiles.ts` | 选择认证配置与 profile。 | Selects auth profile/runtime auth behavior. |
+| `openclaw-tools.ts` | 暴露当前回合可用的工具。 | Exposes the tools available in the turn. |
+| `tool-catalog.ts` | 维护工具目录与描述。 | Maintains tool catalog and metadata. |
 
-So the real architecture is layered, but not strictly one-way in the runtime sense. The best mental model is:
+### 这张图想表达什么 / What this diagram shows
 
-- **control plane owns admission and coordination**
-- **execution plane owns doing the work**
-- **extension plane owns pluggable capabilities**
-- **client plane owns human/device interaction**
+Agent Runtime 的本质不是“调一个模型”，而是：
 
-## Final interpretation
+**会话上下文构造 + 模型选择 + 工具编排 + 结果流式输出**。
 
-This four-layer cut makes OpenClaw easier to reason about because it separates:
+The agent runtime is not just “calling a model”; it is session-aware context assembly, model selection, tool orchestration, and streamed result generation.
 
-- the system boundary from the execution core
-- the execution core from the capability ecosystem
-- the capability ecosystem from the human/device entry surfaces
+---
 
-That framing is especially useful when planning changes, because it quickly reveals whether a change is:
+## 四、Plugin System 图 / Plugin System Architecture
 
-- a control-plane problem
-- an execution/runtime problem
-- an extension-boundary problem
-- or a client/product-surface problem
+```mermaid
+flowchart TB
+  MANIFEST[openclaw.plugin.json]
+  DISCOVERY[discovery.ts]
+  MANREG[manifest-registry.ts]
+  LOADER[loader.ts]
+  REG[registry.ts]
+  SDK[index.ts + plugin-entry/provider-entry/channel-entry]
+  RUNTIME[services/runtime/http routes/commands]
+  EXT[extensions/*]
+
+  MANIFEST --> DISCOVERY
+  DISCOVERY --> MANREG
+  MANREG --> LOADER
+  LOADER --> REG
+  REG --> RUNTIME
+  SDK --> EXT
+  EXT --> LOADER
+```
+
+### Plugin System 的核心职责 / Core Plugin System Responsibilities
+
+| 模块 / Module | 中文说明 | English note |
+| --- | --- | --- |
+| `discovery.ts` | 找到候选插件。 | Discovers candidate plugins. |
+| `manifest-registry.ts` | 读取和缓存 manifest 元数据。 | Reads and caches manifest metadata. |
+| `loader.ts` | 根据 manifest 与运行时策略装载插件模块。 | Loads plugin modules using manifest/runtime rules. |
+| `registry.ts` | 汇总插件注册结果：tools、providers、channels、hooks、services、routes。 | Aggregates plugin registrations across tools/providers/channels/hooks/services/routes. |
+| `plugin-sdk/index.ts` | 根级 SDK 对外面。 | Root public SDK surface. |
+| `plugin-entry.ts` | 定义一般插件入口合同。 | General plugin entry contract. |
+| `provider-entry.ts` | 定义 provider plugin 入口合同。 | Provider plugin entry contract. |
+| `channel-entry-contract.ts` | 定义 channel plugin 入口合同。 | Channel plugin entry contract. |
+
+### 这张图想表达什么 / What this diagram shows
+
+插件系统的关键设计不是“动态 import 很多目录”，而是：
+
+**先看 manifest，再做 enable/validate，再进 runtime registration。**
+
+The key plugin-system design is not “just dynamic import many directories”, but **manifest-first discovery, validation, then runtime registration**.
+
+---
+
+## 五、四层归类表 / Four-Layer Placement Table
+
+| 层 / Layer | 主要目录 / Main modules | 为什么放这里 / Why here |
+| --- | --- | --- |
+| 控制面 / Control Plane | `src/gateway/`, `src/acp/`, `src/config/`, `src/secrets/`, `src/security/`, `src/pairing/` | 负责 admission、协议、认证、治理与系统边界。 / Owns admission, protocol, auth, governance, and the outer system boundary. |
+| 执行面 / Execution Plane | `src/agents/`, `src/sessions/`, `src/routing/`, `src/auto-reply/`, `src/tasks/`, `src/flows/`, `src/process/`, `src/cron/` | 负责真正执行 agent turn。 / Performs the actual runtime work. |
+| 扩展面 / Extension Plane | `src/plugins/`, `src/plugin-sdk/`, `src/hooks/`, `src/channels/`, `extensions/`, `packages/plugin-package-contract`, `packages/memory-host-sdk` | 负责 pluggable capabilities。 / Owns pluggable capabilities. |
+| 客户端面 / Client Plane | `src/cli/`, `src/tui/`, `ui/`, `apps/*`, `Swabble/` | 负责人与设备的入口。 / Owns human/device entry surfaces. |
+
+---
+
+## 六、跨层主链路 / Main Cross-Layer Flows
+
+### 链路 1：操作员发起一次 agent run / Operator-initiated run
+
+```text
+客户端面 Client Plane
+  -> 控制面 Control Plane
+  -> 执行面 Execution Plane
+  -> 扩展面 Extension Plane
+  -> 结果再回到控制面与客户端面
+```
+
+### 链路 2：渠道收到一条消息 / Inbound channel message
+
+```text
+扩展面（channel plugin）
+  -> 控制面（Gateway ingress + trust checks）
+  -> 执行面（routing + sessions + auto-reply + agents）
+  -> 扩展面（channel-specific outbound execution）
+```
+
+### 链路 3：移动节点能力调用 / Mobile node capability invocation
+
+```text
+客户端面（iOS / Android / macOS node）
+  -> 控制面（Gateway connect + pairing）
+  -> 执行面（agent decides action）
+  -> 控制面（Gateway relay）
+  -> 客户端面（node executes and returns result）
+```
+
+---
+
+## 七、最容易混淆的模块 / Ambiguous Modules
+
+| 模块 / Module | 为什么容易混淆 / Why ambiguous | 推荐展示位置 / Best placement |
+| --- | --- | --- |
+| `src/gateway/protocol/` | 同时被 client、gateway、runtime 消费。 / Consumed by clients, gateway, and runtime. | 放控制面。 / Show it in the control plane. |
+| `src/sessions/` + `src/routing/` | 既像控制逻辑，又直接服务执行逻辑。 / Feels like control, but directly shapes execution. | 放执行面。 / Show it in the execution plane. |
+| `src/channels/` | 既有 core 抽象，又和插件强相关。 / Mixes core abstractions and plugin-facing channel behavior. | 放扩展面。 / Show it in the extension plane. |
+| `src/cli/` | 会触发执行，但本质是 operator entry surface。 / Triggers execution but is fundamentally an operator-facing entry surface. | 放客户端面。 / Show it in the client plane. |
+| `src/hooks/` | 运行时会执行，但它是 extensibility seam。 / Executed at runtime, but architecturally it is an extensibility seam. | 放扩展面。 / Show it in the extension plane. |
+
+---
+
+## 八、结论 / Final Interpretation
+
+把 OpenClaw 分成四层之后，很多复杂度会立刻变清楚：
+
+- **控制面**：谁可以进入系统、如何被信任、如何被管理  
+  **Control plane**: who may enter, how they are trusted, how the system is governed
+
+- **执行面**：系统如何完成一次 agent turn  
+  **Execution plane**: how the system completes one agent turn
+
+- **扩展面**：系统能力如何被插件化扩展  
+  **Extension plane**: how capabilities are extended via plugins
+
+- **客户端面**：人和设备如何接触这套系统  
+  **Client plane**: how humans and devices interact with the system
+
+所以，从源码阅读的角度看，最有效的理解路径是：
+
+**先看控制面，再看执行面，然后看扩展边界，最后看客户端表面。**
+
+From a source-reading perspective, the most effective order is: **control plane first, execution plane second, extension seam third, client surfaces last.**
