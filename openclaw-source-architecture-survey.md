@@ -11,6 +11,13 @@ title: "OpenClaw Source Architecture Survey"
 
 This document summarizes a full-source survey of the OpenClaw repository. It focuses on the system's main architectural spine, the role of each major module, and the relationships between the control plane, agent runtime, plugin SDK, extensions, and client surfaces.
 
+## 快速跳转 / Quick Links
+
+- 总索引与阅读路径 / Master index: [openclaw-doc-index-and-reading-paths.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-doc-index-and-reading-paths.md)
+- 执行链与时序 / Execution flows: [openclaw-execution-flows.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-execution-flows.md)
+- 源码导读 / Source guide: [openclaw-source-guide.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-source-guide.md)
+- 分层架构图 / Layered architecture: [openclaw-layered-architecture.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-layered-architecture.md)
+
 ## Executive summary
 
 OpenClaw is best understood as a **gateway-centric, plugin-extended AI agent platform**.
@@ -58,6 +65,8 @@ The top-level directories have distinct responsibilities:
 
 ## 1. Gateway control plane
 
+相关深挖 / Related deep dive: [openclaw-gateway-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-gateway-deep-dive.md)
+
 The Gateway is the system center.
 
 The architecture docs describe it as a single long-lived process that owns messaging surfaces, client connections, node connections, and HTTP/WS endpoints. The implementation in `src/gateway/` confirms that the Gateway is responsible for:
@@ -86,6 +95,8 @@ The Gateway is therefore both:
 
 ## 2. Agent runtime
 
+相关深挖 / Related deep dive: [openclaw-agents-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-agents-deep-dive.md)
+
 The second major spine is `src/agents/`.
 
 This directory is large because it does far more than simple prompt dispatch. It contains the execution machinery for:
@@ -108,6 +119,8 @@ In practice, the runtime split is:
 
 ## 3. Sessions and routing
 
+相关深挖 / Related deep dive: [openclaw-sessions-routing-auto-reply-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-sessions-routing-auto-reply-deep-dive.md)
+
 OpenClaw is a multi-channel, multi-agent, multi-account system, so a dedicated session/routing layer is essential.
 
 Important directories:
@@ -126,6 +139,8 @@ These modules handle:
 They are the bridge between inbound identity and runtime execution. Without them, the platform could not safely multiplex one Gateway across many channels, operators, and agents.
 
 ## 4. Plugin host and SDK boundary
+
+相关深挖 / Related deep dive: [openclaw-plugin-system-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-plugin-system-deep-dive.md)
 
 This is the defining OpenClaw design choice.
 
@@ -407,6 +422,8 @@ This indicates that some subsystems, especially memory and plugin packaging, are
 
 ## 3. Control UI
 
+相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
+
 The web UI under `ui/` is built with:
 
 - Vite
@@ -424,6 +441,8 @@ The corresponding backend glue lives in:
 Its role is operational visibility and control: chat, sessions, nodes, config, logs, and debugging.
 
 ## 4. Native clients and shared Apple SDK
+
+相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
 
 ### `apps/android`
 
@@ -450,6 +469,8 @@ This shared Apple package exports:
 That means the Apple clients share both protocol models and reusable UI/runtime code.
 
 ## 5. Swabble
+
+相关深挖 / Related deep dive: [openclaw-ui-platform-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-ui-platform-deep-dive.md)
 
 `Swabble/` is a separate Swift project with:
 
@@ -515,6 +536,8 @@ The plugin SDK is the formal seam that keeps the core host separate from plugin 
 The browser UI and native apps do not reach into core runtime internals. They connect through protocol and control-plane seams exposed by the Gateway.
 
 ## Architectural character
+
+运行时底座深挖 / Runtime substrate deep dive: [openclaw-runtime-substrate-deep-dive.md](https://github.com/simonggx/openclaw-source-architecture-survey/blob/main/openclaw-runtime-substrate-deep-dive.md)
 
 OpenClaw shows several strong design preferences.
 
